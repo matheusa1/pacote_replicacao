@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -61,6 +62,9 @@ class TestDescoberta(unittest.TestCase):
         analise._AVISOS.clear()
         self.tmp = tempfile.mkdtemp()
 
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
     def _criar_modelo(self, nome, com_ex=True):
         base = os.path.join(self.tmp, nome)
         os.makedirs(os.path.join(base, "Ex1", "1")) if com_ex else os.makedirs(base)
@@ -85,11 +89,24 @@ class TestDescoberta(unittest.TestCase):
         self._criar_modelo("Prompt", com_ex=False)
         self.assertEqual(analise.descobrir_modelos(self.tmp), ["Claude"])
 
+    def test_pasta_salvaguarda_sem_ex_e_descartada_com_log(self):
+        self._criar_modelo("Claude")
+        self._criar_modelo("_backup", com_ex=False)
+        resultado = analise.descobrir_modelos(self.tmp)
+        self.assertEqual(resultado, ["Claude"])
+        self.assertTrue(
+            any("_backup" in aviso for aviso in analise._AVISOS),
+            f"Esperava aviso de descarte mencionando '_backup', obtido: {analise._AVISOS}",
+        )
+
 
 class TestAvaliarStatus(unittest.TestCase):
     def setUp(self):
         analise._AVISOS.clear()
         self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _exec(self, output=None, err=""):
         d = os.path.join(self.tmp, "1")

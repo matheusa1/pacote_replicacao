@@ -112,13 +112,13 @@ def descobrir_modelos(base=RESPOSTAS_DIR):
         caminho = os.path.join(base, nome)
         if not os.path.isdir(caminho):
             continue
+        if nome[0] in "._" or nome.lower() in IGNORAR_MODELOS:
+            registrar("AVISO", f"Pasta ignorada na descoberta de modelos: {nome}")
+            continue
         tem_ex = any(re.fullmatch(r"Ex\d+", x) and
                      os.path.isdir(os.path.join(caminho, x))
                      for x in os.listdir(caminho))
         if not tem_ex:
-            continue
-        if nome[0] in "._" or nome.lower() in IGNORAR_MODELOS:
-            registrar("AVISO", f"Pasta ignorada na descoberta de modelos: {nome}")
             continue
         modelos.append(nome)
     return modelos
