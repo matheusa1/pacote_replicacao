@@ -335,8 +335,11 @@ def estatisticas(valores):
     }
 
 
-def agregar_rq2(linhas, chaves):
+def agregar_rq2(linhas, chaves, tarefas):
     """Agrega tokens por `chaves`, somando sub-modelos dentro de cada execução.
+
+    `chaves` pode incluir `construto`/`variante`, resolvidas via `tarefas`
+    (mesma lógica de `_resolver_chave` usada no RQ1).
 
     Campos ausentes (None) — ex.: entrada/saída do Codex, que só reporta total —
     são ignorados: a execução não contribui para a estatística daquele campo, e
@@ -360,7 +363,7 @@ def agregar_rq2(linhas, chaves):
     execs_por_grupo = {}
     for k, v in por_exec.items():
         ln = exec_campos[k]
-        gk = tuple(ln[c] for c in chaves)
+        gk = tuple(_resolver_chave(ln, c, tarefas) for c in chaves)
         g = grupos.setdefault(gk, {"input": [], "output": [], "total": []})
         execs_por_grupo[gk] = execs_por_grupo.get(gk, 0) + 1
         for campo in ("input", "output", "total"):
@@ -495,9 +498,11 @@ def main():
     rq2 = coletar_rq2(modelos)
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_execucoes.csv"), rq2)
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_modelo_tarefa.csv"),
-                 agregar_rq2(rq2, ["modelo", "tarefa"]))
+                 agregar_rq2(rq2, ["modelo", "tarefa"], tarefas))
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_tarefa.csv"),
-                 agregar_rq2(rq2, ["tarefa"]))
+                 agregar_rq2(rq2, ["tarefa"], tarefas))
+    escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_variante.csv"),
+                 agregar_rq2(rq2, ["variante"], tarefas))
 
     # RQ3
     rq3 = coletar_rq3(modelos)

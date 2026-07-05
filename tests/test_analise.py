@@ -241,7 +241,7 @@ class TestRQ2(unittest.TestCase):
             {"modelo": "Claude", "tarefa": "ex1", "exec": "2",
              "submodelo": "opus", "input": 1000, "output": 100, "total": 1100},
         ]
-        r = analise.agregar_rq2(linhas, ["modelo", "tarefa"])
+        r = analise.agregar_rq2(linhas, ["modelo", "tarefa"], {})
         self.assertEqual(len(r), 1)
         # execução 1 soma 1000 input; execução 2 soma 1000 input -> média 1000
         self.assertEqual(r[0]["input_media"], 1000.0)
@@ -256,7 +256,7 @@ class TestRQ2(unittest.TestCase):
             {"modelo": "Codex", "tarefa": "ex1", "exec": "1",
              "submodelo": "gpt", "input": 900, "output": 90, "total": 990},
         ]
-        r = analise.agregar_rq2(linhas, ["tarefa"])
+        r = analise.agregar_rq2(linhas, ["tarefa"], {})
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["execucoes"], 2)
         self.assertEqual(r[0]["input_media"], 500.0)
@@ -272,13 +272,30 @@ class TestRQ2(unittest.TestCase):
              "input": None, "output": None, "cache_read": None,
              "cache_write": None, "total": 7000},
         ]
-        r = analise.agregar_rq2(linhas, ["modelo", "tarefa"])
+        r = analise.agregar_rq2(linhas, ["modelo", "tarefa"], {})
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["execucoes"], 2)
         self.assertEqual(r[0]["total_media"], 6000.0)
         # sem breakdown de entrada/saída -> colunas vazias, não zero
         self.assertEqual(r[0]["input_media"], "")
         self.assertEqual(r[0]["output_media"], "")
+
+    def test_agregar_rq2_por_variante_resolve_via_tarefas(self):
+        tarefas = {
+            ("Claude", "ex1"): {"construto": "lambda", "variante": "funcional"},
+            ("Codex", "ex1"): {"construto": "if/else", "variante": "procedural"},
+        }
+        linhas = [
+            {"modelo": "Claude", "tarefa": "ex1", "exec": "1",
+             "submodelo": "haiku", "input": 100, "output": 10, "total": 110},
+            {"modelo": "Codex", "tarefa": "ex1", "exec": "1",
+             "submodelo": "gpt", "input": 900, "output": 90, "total": 990},
+        ]
+        r = analise.agregar_rq2(linhas, ["variante"], tarefas)
+        self.assertEqual(len(r), 2)
+        por_variante = {ln["variante"]: ln for ln in r}
+        self.assertEqual(por_variante["funcional"]["input_media"], 100.0)
+        self.assertEqual(por_variante["procedural"]["input_media"], 900.0)
 
 
 class TestRQ3(unittest.TestCase):
