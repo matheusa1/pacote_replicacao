@@ -194,5 +194,35 @@ class TestRQ2(unittest.TestCase):
         self.assertEqual(r[0]["total_media"], 1100.0)
 
 
+class TestRQ3(unittest.TestCase):
+    def setUp(self):
+        analise._AVISOS.clear()
+
+    def test_parse_rq3_completo(self):
+        texto = ("## 1. Quando usar funcional\nA\n"
+                 "## 2. Quando usar procedural\nB\n"
+                 "## 3. Regra\nC\n## 4. Exemplo\nD\n## 5. Risco\nE\n")
+        r = analise.parse_rq3(texto)
+        self.assertEqual(r[1].strip(), "A")
+        self.assertEqual(r[5].strip(), "E")
+
+    def test_parse_rq3_sem_hashes(self):
+        texto = "1. Funcional\nA\n2. Proc\nB\n3. R\nC\n4. Ex\nD\n5. Risco\nE\n"
+        r = analise.parse_rq3(texto)
+        self.assertEqual(r[2].strip(), "B")
+
+    def test_parse_rq3_secao_faltando(self):
+        texto = "## 1. F\nA\n## 2. P\nB\n## 3. R\nC\n## 4. E\nD\n"
+        r = analise.parse_rq3(texto)
+        self.assertIsNone(r[5])
+
+    def test_contar_termos(self):
+        texto = "Legibilidade importa. O código legível vence. Estilo funcional."
+        r = analise.contar_termos(texto)
+        self.assertEqual(r["legibilidade"], 2)
+        self.assertEqual(r["funcional"], 1)
+        self.assertEqual(r["procedural"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

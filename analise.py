@@ -266,3 +266,45 @@ def agregar_rq2(linhas, chaves):
             linha[f"{campo}_desvio"] = est["desvio"]
         resultado.append(linha)
     return resultado
+
+
+_ANCORA_RQ3 = re.compile(r"^\s*(?:#+\s*)?([1-5])\.\s*(.*)$", re.MULTILINE)
+
+
+def parse_rq3(texto):
+    """Divide o RQ3.txt nas seções 1..5; ausentes -> None."""
+    secoes = {i: None for i in range(1, 6)}
+    marcas = [(int(m.group(1)), m.start(), m.end()) for m in _ANCORA_RQ3.finditer(texto)]
+    for idx, (num, _, fim) in enumerate(marcas):
+        inicio_corpo = fim
+        fim_corpo = marcas[idx + 1][1] if idx + 1 < len(marcas) else len(texto)
+        secoes[num] = texto[inicio_corpo:fim_corpo].strip()
+    return secoes
+
+
+def contar_termos(texto):
+    """Conta menções (case-insensitive) por termo canônico, somando variações."""
+    baixo = texto.lower()
+    contagem = {}
+    for canonico, variacoes in TERMOS_RQ3.items():
+        total = 0
+        for v in variacoes:
+            total += len(re.findall(r"\b" + re.escape(v.lower()) + r"\b", baixo))
+        contagem[canonico] = total
+    return contagem
+
+
+def coletar_rq3():
+    """Coleta seções e termos por modelo; loga seções ausentes."""
+    dados = {}
+    for modelo in descobrir_modelos():
+        texto = ler_texto(os.path.join(RESPOSTAS_DIR, modelo, "RQ3.txt"))
+        if texto is None:
+            registrar("AVISO", f"RQ3.txt ausente para o modelo: {modelo}")
+            continue
+        secoes = parse_rq3(texto)
+        faltando = [str(n) for n, v in secoes.items() if v is None]
+        if faltando:
+            registrar("AVISO", f"RQ3 [{modelo}]: seções ausentes: {', '.join(faltando)}")
+        dados[modelo] = {"secoes": secoes, "termos": contar_termos(texto)}
+    return dados
