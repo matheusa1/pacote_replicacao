@@ -234,7 +234,7 @@ def estatisticas(valores):
     return {
         "media": round(statistics.mean(valores), 2),
         "mediana": round(statistics.median(valores), 2),
-        "desvio": round(statistics.pstdev(valores), 4),
+        "desvio": round(statistics.pstdev(valores), 2),
     }
 
 

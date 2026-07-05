@@ -172,7 +172,7 @@ class TestRQ2(unittest.TestCase):
         r = analise.estatisticas([10, 20, 30])
         self.assertEqual(r["media"], 20.0)
         self.assertEqual(r["mediana"], 20.0)
-        self.assertAlmostEqual(r["desvio"], 8.1649, places=3)
+        self.assertEqual(r["desvio"], 8.16)
 
     def test_estatisticas_vazio(self):
         self.assertEqual(analise.estatisticas([]),
