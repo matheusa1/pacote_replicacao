@@ -1,0 +1,4 @@
+Resolva o exercício [PATH.py] e coloque o resultado [PATH.py]
+Não teste o código, apenas crie o código necessário para resolver o exercício.
+Não dê textos explicando o que fez, apenas deixe o código.
+Não deixe a pergunta e comentários no código.
