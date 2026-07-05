@@ -1,4 +1,7 @@
-def function(x, y):
-    return min(x, y)
-
-print(function(4, 2))
+S=[1,2,3]
+lst=[]
+for f in S :
+	for g in S:
+		if f < g:
+			lst.append((f,g))
+print(lst)

@@ -1,5 +1,1 @@
-def function(x, y):
-    return min(x, y)
-
-
-print(function(4, 2))
+print((lambda x: x.upper() if isinstance(x, str) and len(x) == 1 else '?')('-2'))

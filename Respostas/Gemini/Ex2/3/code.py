@@ -1,7 +1,1 @@
-S=[1,2,3]
-lst=[]
-for f in S :
-	for g in S:
-		if f < g:
-			lst.append((f,g))
-print(lst)
+print((lambda x: x.upper() if isinstance(x, str) and len(x) == 1 else '?')('-2'))

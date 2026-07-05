@@ -71,6 +71,24 @@ def parse_usage(texto):
     return entradas
 
 
+_LINHA_USAGE_GEMINI = re.compile(
+    r"Thought for\s+\d+(?:\.\d+)?s,\s*([\d.]+k?)\s*tokens", re.IGNORECASE)
+
+
+def parse_usage_gemini(texto):
+    """Soma os tokens de cada bloco 'Thought for Ns, M tokens' (formato Gemini).
+
+    Um usage.txt do Gemini lista um ou mais blocos de raciocínio; o total da
+    execução é a soma de todos eles, não apenas o último (ao contrário do
+    formato Codex, que reporta um único total já consolidado).
+    Retorna None se nenhum bloco for encontrado.
+    """
+    tokens = [expandir_tokens(m.group(1)) for m in _LINHA_USAGE_GEMINI.finditer(texto)]
+    if not tokens:
+        return None
+    return sum(tokens)
+
+
 _NUM_USAGE_TOTAL = re.compile(r"(\d+(?:\.\d+)?)\s*([kK])?")
 
 
@@ -289,9 +307,12 @@ def coletar_rq2(modelos=None):
                           "total": e["input"] + e["output"]})
                 linhas.append(e)
             continue
-        # Formato alternativo com total único (ex.: Codex): sem breakdown
-        # entrada/saída, então esses campos ficam vazios (None).
-        total = parse_usage_total(texto)
+        # Formatos alternativos com total único (sem breakdown entrada/saída,
+        # que fica vazio/None): Gemini soma os blocos "Thought for..."; Codex
+        # reporta um único total já consolidado.
+        total = parse_usage_gemini(texto)
+        if total is None:
+            total = parse_usage_total(texto)
         if total is None:
             registrar("AVISO", f"usage.txt não reconhecido (RQ2 pulada) em: {edir}")
             continue

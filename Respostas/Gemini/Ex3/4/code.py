@@ -1,3 +1,7 @@
-items=(2, 'pair',3,'odd')
-l=[x for x in items if isinstance(x, str)]
-print(l)
+S=[1,2,3]
+lst=[]
+for f in S :
+	for g in S:
+		if f < g:
+			lst.append((f,g))
+print(lst)

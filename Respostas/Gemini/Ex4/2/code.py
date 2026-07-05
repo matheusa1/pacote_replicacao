@@ -1,1 +1,3 @@
-print((lambda x: x.upper() if isinstance(x, str) and len(x) == 1 else '?')('-2'))
+items=(2, 'pair',3,'odd')
+l=[x for x in items if isinstance(x, str)]
+print(l)

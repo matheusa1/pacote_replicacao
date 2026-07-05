@@ -9,3 +9,8 @@ Claude,ex4,for loop com append,procedural
 Codex,ex4,list comprehension,funcional
 Claude,ex5,filter + lambda,funcional
 Codex,ex5,for loop com append,procedural
+Gemini,ex1,função nomeada,funcional
+Gemini,ex2,lambda com condicional (isinstance),funcional
+Gemini,ex3,for loop aninhado com append,procedural
+Gemini,ex4,list comprehension,funcional
+Gemini,ex5,map + lambda,funcional
