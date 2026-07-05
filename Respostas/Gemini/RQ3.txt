@@ -1,0 +1,32 @@
+## 1. Quando usar funcional
+* Transformações diretas de dados: List/dict comprehensions são mais legíveis e rápidas do que loops tradicionais para mapear e filtrar coleções sem efeitos colaterais.
+* Operações matemáticas e pipelines limpos: O uso de funções puras e compostas facilita o rastreamento do fluxo de dados e elimina bugs decorrentes de estado mutável compartilhado.
+* Callbacks simples e rápidos: Expressões `lambda` e funções de alta ordem são ideais para injetar lógica curta em funções nativas como `sorted()`, `min()` e `max()`.
+* Processamento paralelo ou concorrente simples: Funções sem efeitos colaterais (puras) podem ser distribuídas facilmente em threads ou processos sem a necessidade de travas complexas.
+
+## 2. Quando usar procedural
+* Controle de fluxo complexo com saídas antecipadas: Loops explícitos (`for`/`while`) com `break` ou `continue` evitam código aninhado e confuso característico do estilo funcional extremo.
+* Manipulação pesada de estado e efeitos colaterais: Operações que dependem de escrita em disco, requisições de rede ou mutação direta de objetos são expressas de forma mais natural e segura em passos sequenciais.
+* Algoritmos de alta performance com mutabilidade local: Modificar um array ou lista existente (in-place) economiza alocação de memória e processamento comparado à recriação constante de estruturas.
+* Depuração e logging passo a passo: Loops procedurais permitem inspecionar o estado em qualquer linha intermediária e inserir logs detalhados de maneira simples.
+
+## 3. Regra prática de decisão
+Se a operação puder ser escrita como uma transformação linear de dados sem efeitos colaterais e couber em uma linha legível, use o estilo funcional (preferencialmente comprehensions); caso contrário, opte pelo procedural.
+
+## 4. Exemplo mínimo
+```python
+# Problema: Obter o quadrado dos números pares de uma lista
+numeros = [1, 2, 3, 4, 5]
+
+# Funcional (Recomendado: mais conciso, direto e idiomático em Python)
+quadrados_pares_func = [x**2 for x in numeros if x % 2 == 0]
+
+# Procedural (Mais verboso para uma operação simples)
+quadrados_pares_proc = []
+for x in numeros:
+    if x % 2 == 0:
+        quadrados_pares_proc.append(x**2)
+```
+
+## 5. Maior risco/armadilha
+O maior risco é a perda extrema de legibilidade (gerando "código write-only") ao tentar forçar construtos funcionais como `map`, `filter`, `reduce` ou `comprehensions` gigantes e aninhadas em lógicas complexas que seriam simples e legíveis com um loop `for` estruturado.
