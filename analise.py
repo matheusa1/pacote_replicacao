@@ -155,25 +155,34 @@ def carregar_tarefas():
     return tarefas
 
 
-def coletar_rq1():
-    """Varre as execuções e classifica o status de cada uma."""
-    linhas = []
-    for modelo in descobrir_modelos():
+def _iter_execucoes(modelos=None):
+    """Yields (modelo, tarefa, exec_dir) for every execution directory."""
+    for modelo in (modelos if modelos is not None else descobrir_modelos()):
         mdir = os.path.join(RESPOSTAS_DIR, modelo)
         for tdir in sorted(os.listdir(mdir)):
-            if not re.fullmatch(r"Ex\d+", tdir):
-                continue
-            tarefa = tdir.lower()
-            gabarito = ler_texto(os.path.join(GABARITO_DIR, f"{tarefa}.txt"))
             tcaminho = os.path.join(mdir, tdir)
+            if not re.fullmatch(r"Ex\d+", tdir) or not os.path.isdir(tcaminho):
+                continue
             for ex in sorted(os.listdir(tcaminho)):
                 edir = os.path.join(tcaminho, ex)
                 if not os.path.isdir(edir):
                     continue
-                linhas.append({
-                    "modelo": modelo, "tarefa": tarefa, "exec": ex,
-                    "status": avaliar_status(edir, gabarito),
-                })
+                yield modelo, tdir.lower(), edir
+
+
+def coletar_rq1(modelos=None):
+    """Varre as execuções e classifica o status de cada uma."""
+    linhas = []
+    gabaritos = {}
+    for modelo, tarefa, edir in _iter_execucoes(modelos):
+        if tarefa not in gabaritos:
+            gabaritos[tarefa] = ler_texto(os.path.join(GABARITO_DIR, f"{tarefa}.txt"))
+        gabarito = gabaritos[tarefa]
+        ex = os.path.basename(edir)
+        linhas.append({
+            "modelo": modelo, "tarefa": tarefa, "exec": ex,
+            "status": avaliar_status(edir, gabarito),
+        })
     return linhas
 
 
@@ -202,28 +211,19 @@ def taxa_por(linhas, chaves, tarefas):
     return resultado
 
 
-def coletar_rq2():
+def coletar_rq2(modelos=None):
     """Uma linha por (execução × sub-modelo) com os tokens."""
     linhas = []
-    for modelo in descobrir_modelos():
-        mdir = os.path.join(RESPOSTAS_DIR, modelo)
-        for tdir in sorted(os.listdir(mdir)):
-            if not re.fullmatch(r"Ex\d+", tdir):
-                continue
-            tarefa = tdir.lower()
-            tcaminho = os.path.join(mdir, tdir)
-            for ex in sorted(os.listdir(tcaminho)):
-                edir = os.path.join(tcaminho, ex)
-                if not os.path.isdir(edir):
-                    continue
-                texto = ler_texto(os.path.join(edir, "usage.txt"))
-                if texto is None:
-                    registrar("AVISO", f"usage.txt ausente (RQ2 pulada) em: {edir}")
-                    continue
-                for e in parse_usage(texto):
-                    e.update({"modelo": modelo, "tarefa": tarefa, "exec": ex,
-                              "total": e["input"] + e["output"]})
-                    linhas.append(e)
+    for modelo, tarefa, edir in _iter_execucoes(modelos):
+        ex = os.path.basename(edir)
+        texto = ler_texto(os.path.join(edir, "usage.txt"))
+        if texto is None:
+            registrar("AVISO", f"usage.txt ausente (RQ2 pulada) em: {edir}")
+            continue
+        for e in parse_usage(texto):
+            e.update({"modelo": modelo, "tarefa": tarefa, "exec": ex,
+                      "total": e["input"] + e["output"]})
+            linhas.append(e)
     return linhas
 
 
@@ -240,17 +240,21 @@ def estatisticas(valores):
 
 def agregar_rq2(linhas, chaves):
     """Agrega tokens por `chaves`, somando sub-modelos dentro de cada execução."""
-    # 1) soma sub-modelos por execução completa (chaves + exec)
+    # 1) soma sub-modelos por execução completa (identidade plena: modelo+tarefa+exec)
     por_exec = {}
     for ln in linhas:
-        k = tuple(ln[c] for c in chaves) + (ln["exec"],)
+        k = (ln["modelo"], ln["tarefa"], ln["exec"])
         acc = por_exec.setdefault(k, {"input": 0, "output": 0, "total": 0})
         for campo in ("input", "output", "total"):
             acc[campo] += ln[campo]
-    # 2) agrupa execuções por `chaves`
+    # 2) agrupa execuções por `chaves` (derivadas dos campos da própria execução)
+    exec_campos = {}
+    for ln in linhas:
+        exec_campos.setdefault((ln["modelo"], ln["tarefa"], ln["exec"]), ln)
     grupos = {}
     for k, v in por_exec.items():
-        gk = k[:len(chaves)]
+        ln = exec_campos[k]
+        gk = tuple(ln[c] for c in chaves)
         g = grupos.setdefault(gk, {"input": [], "output": [], "total": []})
         for campo in ("input", "output", "total"):
             g[campo].append(v[campo])
@@ -294,10 +298,10 @@ def contar_termos(texto):
     return contagem
 
 
-def coletar_rq3():
+def coletar_rq3(modelos=None):
     """Coleta seções e termos por modelo; loga seções ausentes."""
     dados = {}
-    for modelo in descobrir_modelos():
+    for modelo in (modelos if modelos is not None else descobrir_modelos()):
         texto = ler_texto(os.path.join(RESPOSTAS_DIR, modelo, "RQ3.txt"))
         if texto is None:
             registrar("AVISO", f"RQ3.txt ausente para o modelo: {modelo}")
@@ -348,9 +352,10 @@ def escrever_avisos(caminho):
 def main():
     os.makedirs(RESULTADOS_DIR, exist_ok=True)
     tarefas = carregar_tarefas()
+    modelos = descobrir_modelos()
 
     # RQ1
-    rq1 = coletar_rq1()
+    rq1 = coletar_rq1(modelos)
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq1_execucoes.csv"), rq1)
     for nome, chaves in [
         ("rq1_por_modelo", ["modelo"]),
@@ -363,7 +368,7 @@ def main():
                      taxa_por(rq1, chaves, tarefas))
 
     # RQ2
-    rq2 = coletar_rq2()
+    rq2 = coletar_rq2(modelos)
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_execucoes.csv"), rq2)
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_modelo_tarefa.csv"),
                  agregar_rq2(rq2, ["modelo", "tarefa"]))
@@ -371,13 +376,13 @@ def main():
                  agregar_rq2(rq2, ["tarefa"]))
 
     # RQ3
-    rq3 = coletar_rq3()
+    rq3 = coletar_rq3(modelos)
     escrever_rq3_comparativo(os.path.join(RESULTADOS_DIR, "rq3_comparativo.md"), rq3)
     termos = [{"modelo": m, **rq3[m]["termos"]} for m in sorted(rq3)]
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq3_termos.csv"), termos)
 
     # Resumo + log
-    print(f"\nModelos: {descobrir_modelos()} | execuções RQ1: {len(rq1)} | "
+    print(f"\nModelos: {modelos} | execuções RQ1: {len(rq1)} | "
           f"linhas RQ2: {len(rq2)} | avisos: {len(_AVISOS)}")
     escrever_avisos(os.path.join(RESULTADOS_DIR, "avisos.log"))
 

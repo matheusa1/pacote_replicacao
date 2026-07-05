@@ -100,6 +100,37 @@ class TestDescoberta(unittest.TestCase):
         )
 
 
+class TestIterExecucoes(unittest.TestCase):
+    def setUp(self):
+        analise._AVISOS.clear()
+        self.tmp = tempfile.mkdtemp()
+        self._orig_respostas_dir = analise.RESPOSTAS_DIR
+        analise.RESPOSTAS_DIR = self.tmp
+
+    def tearDown(self):
+        analise.RESPOSTAS_DIR = self._orig_respostas_dir
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_ignora_arquivo_ex_espurio(self):
+        mdir = os.path.join(self.tmp, "Claude")
+        os.makedirs(os.path.join(mdir, "Ex1", "1"))
+        with open(os.path.join(mdir, "Ex1", "1", "output.txt"), "w", encoding="utf-8") as f:
+            f.write("2")
+        with open(os.path.join(mdir, "Ex1", "1", "err.txt"), "w", encoding="utf-8") as f:
+            f.write("")
+        with open(os.path.join(mdir, "Ex1", "1", "usage.txt"), "w", encoding="utf-8") as f:
+            f.write("x")
+        # Arquivo espúrio (não diretório) chamado Ex2
+        with open(os.path.join(mdir, "Ex2"), "w", encoding="utf-8") as f:
+            f.write("nao sou um diretorio")
+
+        resultado = list(analise._iter_execucoes(modelos=["Claude"]))
+        self.assertEqual(len(resultado), 1)
+        modelo, tarefa, edir = resultado[0]
+        self.assertEqual(modelo, "Claude")
+        self.assertEqual(tarefa, "ex1")
+
+
 class TestAvaliarStatus(unittest.TestCase):
     def setUp(self):
         analise._AVISOS.clear()
@@ -192,6 +223,20 @@ class TestRQ2(unittest.TestCase):
         # execução 1 soma 1000 input; execução 2 soma 1000 input -> média 1000
         self.assertEqual(r[0]["input_media"], 1000.0)
         self.assertEqual(r[0]["total_media"], 1100.0)
+
+    def test_agregar_rq2_por_tarefa_nao_conflate_modelos(self):
+        # Duas execuções de MODELOS diferentes com o mesmo id de exec ("1")
+        # compartilhando a mesma tarefa não podem ser somadas em uma só observação.
+        linhas = [
+            {"modelo": "Claude", "tarefa": "ex1", "exec": "1",
+             "submodelo": "haiku", "input": 100, "output": 10, "total": 110},
+            {"modelo": "Codex", "tarefa": "ex1", "exec": "1",
+             "submodelo": "gpt", "input": 900, "output": 90, "total": 990},
+        ]
+        r = analise.agregar_rq2(linhas, ["tarefa"])
+        self.assertEqual(len(r), 1)
+        self.assertEqual(r[0]["execucoes"], 2)
+        self.assertEqual(r[0]["input_media"], 500.0)
 
 
 class TestRQ3(unittest.TestCase):
