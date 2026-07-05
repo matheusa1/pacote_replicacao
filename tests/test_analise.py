@@ -141,5 +141,31 @@ class TestAvaliarStatus(unittest.TestCase):
         self.assertEqual(analise.avaliar_status(d, None), "ausente")
 
 
+class TestAgregacaoRQ1(unittest.TestCase):
+    def setUp(self):
+        self.tarefas = {
+            "ex1": {"construto": "lambda", "variante": "funcional"},
+            "ex2": {"construto": "comprehension", "variante": "funcional"},
+        }
+        self.linhas = [
+            {"modelo": "Claude", "tarefa": "ex1", "exec": "1", "status": "ok"},
+            {"modelo": "Claude", "tarefa": "ex1", "exec": "2", "status": "saida_incorreta"},
+            {"modelo": "Claude", "tarefa": "ex2", "exec": "1", "status": "ok"},
+        ]
+
+    def test_taxa_por_tarefa(self):
+        r = analise.taxa_por(self.linhas, ["tarefa"], self.tarefas)
+        ex1 = [x for x in r if x["tarefa"] == "ex1"][0]
+        self.assertEqual(ex1["sucessos"], 1)
+        self.assertEqual(ex1["total"], 2)
+        self.assertEqual(ex1["taxa"], 0.5)
+
+    def test_taxa_por_construto(self):
+        r = analise.taxa_por(self.linhas, ["construto"], self.tarefas)
+        self.assertEqual(len(r), 2)
+        lam = [x for x in r if x["construto"] == "lambda"][0]
+        self.assertEqual(lam["taxa"], 0.5)
+
+
 if __name__ == "__main__":
     unittest.main()

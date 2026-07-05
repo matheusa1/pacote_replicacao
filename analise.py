@@ -135,3 +135,68 @@ def avaliar_status(exec_dir, gabarito):
     if err is not None and err.strip():
         return "erro_execucao"
     return "ok" if comparar_saida(output, gabarito) else "saida_incorreta"
+
+
+def carregar_tarefas():
+    """Lê Material/tarefas.csv -> {tarefa: {construto, variante}}."""
+    tarefas = {}
+    texto = ler_texto(TAREFAS_CSV)
+    if texto is None:
+        registrar("ERRO", f"tarefas.csv não encontrado: {TAREFAS_CSV}")
+        return tarefas
+    for row in csv.DictReader(texto.splitlines()):
+        t = row["tarefa"].strip().lower()
+        tarefas[t] = {
+            "construto": row["construto"].strip(),
+            "variante": row["variante"].strip(),
+        }
+        if "PLACEHOLDER" in (row["construto"] + row["variante"]).upper():
+            registrar("AVISO", f"tarefas.csv ainda com placeholder em: {t}")
+    return tarefas
+
+
+def coletar_rq1():
+    """Varre as execuções e classifica o status de cada uma."""
+    linhas = []
+    for modelo in descobrir_modelos():
+        mdir = os.path.join(RESPOSTAS_DIR, modelo)
+        for tdir in sorted(os.listdir(mdir)):
+            if not re.fullmatch(r"Ex\d+", tdir):
+                continue
+            tarefa = tdir.lower()
+            gabarito = ler_texto(os.path.join(GABARITO_DIR, f"{tarefa}.txt"))
+            tcaminho = os.path.join(mdir, tdir)
+            for ex in sorted(os.listdir(tcaminho)):
+                edir = os.path.join(tcaminho, ex)
+                if not os.path.isdir(edir):
+                    continue
+                linhas.append({
+                    "modelo": modelo, "tarefa": tarefa, "exec": ex,
+                    "status": avaliar_status(edir, gabarito),
+                })
+    return linhas
+
+
+def _resolver_chave(linha, chave, tarefas):
+    if chave in ("construto", "variante"):
+        return tarefas.get(linha["tarefa"], {}).get(chave, "DESCONHECIDO")
+    return linha[chave]
+
+
+def taxa_por(linhas, chaves, tarefas):
+    """Agrega taxa de sucesso (status=='ok') por combinação de `chaves`."""
+    grupos = {}
+    for ln in linhas:
+        k = tuple(_resolver_chave(ln, c, tarefas) for c in chaves)
+        g = grupos.setdefault(k, {"sucessos": 0, "total": 0})
+        g["total"] += 1
+        if ln["status"] == "ok":
+            g["sucessos"] += 1
+    resultado = []
+    for k, g in sorted(grupos.items()):
+        linha = dict(zip(chaves, k))
+        linha["sucessos"] = g["sucessos"]
+        linha["total"] = g["total"]
+        linha["taxa"] = round(g["sucessos"] / g["total"], 2) if g["total"] else 0.0
+        resultado.append(linha)
+    return resultado
