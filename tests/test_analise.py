@@ -39,6 +39,29 @@ class TestParseUsage(unittest.TestCase):
         self.assertEqual(opus["cache_write"], 8300)
 
 
+class TestParseUsageTotal(unittest.TestCase):
+    def test_com_nome_modelo_e_used(self):
+        # o total é o ÚLTIMO número; '5.5' do nome do modelo é ignorado
+        self.assertEqual(analise.parse_usage_total("gpt-5.5 · 12.4K used"), 12400)
+
+    def test_nome_modelo_e_sufixo_k(self):
+        self.assertEqual(analise.parse_usage_total("gpt 5.5  11.479k"), 11479)
+
+    def test_bare_k(self):
+        self.assertEqual(analise.parse_usage_total("11.010k"), 11010)
+
+    def test_ponto_como_milhares(self):
+        self.assertEqual(analise.parse_usage_total("5.642"), 5642)
+        self.assertEqual(analise.parse_usage_total("19.149"), 19149)
+
+    def test_inteiro_puro(self):
+        self.assertEqual(analise.parse_usage_total("7444"), 7444)
+        self.assertEqual(analise.parse_usage_total("4818"), 4818)
+
+    def test_sem_numero(self):
+        self.assertIsNone(analise.parse_usage_total("nenhum numero aqui"))
+
+
 class TestComparacao(unittest.TestCase):
     def test_normalizar_remove_espacos_e_linhas(self):
         self.assertEqual(analise.normalizar_saida("  2 \n\n"), "2")
@@ -238,6 +261,25 @@ class TestRQ2(unittest.TestCase):
         self.assertEqual(r[0]["execucoes"], 2)
         self.assertEqual(r[0]["input_media"], 500.0)
 
+    def test_agregar_total_only_ignora_entrada_saida(self):
+        # Codex só reporta total: input/output=None. O total agrega os dois
+        # modelos; input/output ficam vazios quando não há dados no grupo.
+        linhas = [
+            {"modelo": "Codex", "tarefa": "ex1", "exec": "1", "submodelo": "total",
+             "input": None, "output": None, "cache_read": None,
+             "cache_write": None, "total": 5000},
+            {"modelo": "Codex", "tarefa": "ex1", "exec": "2", "submodelo": "total",
+             "input": None, "output": None, "cache_read": None,
+             "cache_write": None, "total": 7000},
+        ]
+        r = analise.agregar_rq2(linhas, ["modelo", "tarefa"])
+        self.assertEqual(len(r), 1)
+        self.assertEqual(r[0]["execucoes"], 2)
+        self.assertEqual(r[0]["total_media"], 6000.0)
+        # sem breakdown de entrada/saída -> colunas vazias, não zero
+        self.assertEqual(r[0]["input_media"], "")
+        self.assertEqual(r[0]["output_media"], "")
+
 
 class TestRQ3(unittest.TestCase):
     def setUp(self):
@@ -255,6 +297,16 @@ class TestRQ3(unittest.TestCase):
         texto = "1. Funcional\nA\n2. Proc\nB\n3. R\nC\n4. Ex\nD\n5. Risco\nE\n"
         r = analise.parse_rq3(texto)
         self.assertEqual(r[2].strip(), "B")
+
+    def test_parse_rq3_com_bullet_e_indentacao(self):
+        # Formato Codex: seção 1 com prefixo de bullet, demais indentadas
+        texto = ("• ## 1. Funcional\n  corpo1\n"
+                 "  ## 2. Procedural\n  corpo2\n"
+                 "  ## 3. Regra\n  c3\n  ## 4. Ex\n  c4\n  ## 5. Risco\n  c5\n")
+        r = analise.parse_rq3(texto)
+        self.assertEqual(r[1].strip(), "corpo1")
+        self.assertEqual(r[2].strip(), "corpo2")
+        self.assertEqual(r[5].strip(), "c5")
 
     def test_parse_rq3_secao_faltando(self):
         texto = "## 1. F\nA\n## 2. P\nB\n## 3. R\nC\n## 4. E\nD\n"

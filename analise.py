@@ -58,7 +58,7 @@ _LINHA_USAGE = re.compile(
 
 
 def parse_usage(texto):
-    """Extrai tokens por sub-modelo de um usage.txt."""
+    """Extrai tokens por sub-modelo de um usage.txt (formato Claude Code)."""
     entradas = []
     for m in _LINHA_USAGE.finditer(texto):
         entradas.append({
@@ -69,6 +69,26 @@ def parse_usage(texto):
             "cache_write": expandir_tokens(m.group(5)),
         })
     return entradas
+
+
+_NUM_USAGE_TOTAL = re.compile(r"(\d+(?:\.\d+)?)\s*([kK])?")
+
+
+def parse_usage_total(texto):
+    """Extrai um único total de tokens de formatos alternativos (ex.: Codex).
+
+    O total é sempre o último número da linha (o nome/versão do modelo, ex.
+    'gpt-5.5', vem antes). Convenção 'ponto = milhares': '12.4K'->12400,
+    '11.479k'->11479, '5.642'->5642, '7444'->7444, '4818'->4818.
+    Retorna None se nenhum número for encontrado.
+    """
+    matches = [(m.group(1), m.group(2)) for m in _NUM_USAGE_TOTAL.finditer(texto)]
+    if not matches:
+        return None
+    num, suf = matches[-1]
+    if suf or "." in num:
+        return int(round(float(num) * 1000))
+    return int(num)
 
 
 def normalizar_saida(texto):
@@ -220,10 +240,24 @@ def coletar_rq2(modelos=None):
         if texto is None:
             registrar("AVISO", f"usage.txt ausente (RQ2 pulada) em: {edir}")
             continue
-        for e in parse_usage(texto):
-            e.update({"modelo": modelo, "tarefa": tarefa, "exec": ex,
-                      "total": e["input"] + e["output"]})
-            linhas.append(e)
+        entradas = parse_usage(texto)
+        if entradas:
+            for e in entradas:
+                e.update({"modelo": modelo, "tarefa": tarefa, "exec": ex,
+                          "total": e["input"] + e["output"]})
+                linhas.append(e)
+            continue
+        # Formato alternativo com total único (ex.: Codex): sem breakdown
+        # entrada/saída, então esses campos ficam vazios (None).
+        total = parse_usage_total(texto)
+        if total is None:
+            registrar("AVISO", f"usage.txt não reconhecido (RQ2 pulada) em: {edir}")
+            continue
+        linhas.append({
+            "submodelo": "total", "input": None, "output": None,
+            "cache_read": None, "cache_write": None,
+            "modelo": modelo, "tarefa": tarefa, "exec": ex, "total": total,
+        })
     return linhas
 
 
@@ -239,40 +273,56 @@ def estatisticas(valores):
 
 
 def agregar_rq2(linhas, chaves):
-    """Agrega tokens por `chaves`, somando sub-modelos dentro de cada execução."""
-    # 1) soma sub-modelos por execução completa (identidade plena: modelo+tarefa+exec)
+    """Agrega tokens por `chaves`, somando sub-modelos dentro de cada execução.
+
+    Campos ausentes (None) — ex.: entrada/saída do Codex, que só reporta total —
+    são ignorados: a execução não contribui para a estatística daquele campo, e
+    um grupo sem nenhum dado de um campo tem suas colunas deixadas vazias.
+    """
+    # 1) soma sub-modelos por execução completa (identidade: modelo+tarefa+exec).
+    #    Um campo permanece None enquanto nenhum sub-modelo tiver valor para ele.
     por_exec = {}
     for ln in linhas:
         k = (ln["modelo"], ln["tarefa"], ln["exec"])
-        acc = por_exec.setdefault(k, {"input": 0, "output": 0, "total": 0})
+        acc = por_exec.setdefault(k, {"input": None, "output": None, "total": None})
         for campo in ("input", "output", "total"):
-            acc[campo] += ln[campo]
+            v = ln[campo]
+            if v is not None:
+                acc[campo] = (acc[campo] or 0) + v
     # 2) agrupa execuções por `chaves` (derivadas dos campos da própria execução)
     exec_campos = {}
     for ln in linhas:
         exec_campos.setdefault((ln["modelo"], ln["tarefa"], ln["exec"]), ln)
     grupos = {}
+    execs_por_grupo = {}
     for k, v in por_exec.items():
         ln = exec_campos[k]
         gk = tuple(ln[c] for c in chaves)
         g = grupos.setdefault(gk, {"input": [], "output": [], "total": []})
+        execs_por_grupo[gk] = execs_por_grupo.get(gk, 0) + 1
         for campo in ("input", "output", "total"):
-            g[campo].append(v[campo])
-    # 3) estatísticas
+            if v[campo] is not None:
+                g[campo].append(v[campo])
+    # 3) estatísticas (campo sem dados -> colunas vazias)
     resultado = []
     for gk, g in sorted(grupos.items()):
         linha = dict(zip(chaves, gk))
-        linha["execucoes"] = len(g["total"])
+        linha["execucoes"] = execs_por_grupo[gk]
         for campo in ("input", "output", "total"):
-            est = estatisticas(g[campo])
-            linha[f"{campo}_media"] = est["media"]
-            linha[f"{campo}_mediana"] = est["mediana"]
-            linha[f"{campo}_desvio"] = est["desvio"]
+            if g[campo]:
+                est = estatisticas(g[campo])
+                linha[f"{campo}_media"] = est["media"]
+                linha[f"{campo}_mediana"] = est["mediana"]
+                linha[f"{campo}_desvio"] = est["desvio"]
+            else:
+                linha[f"{campo}_media"] = ""
+                linha[f"{campo}_mediana"] = ""
+                linha[f"{campo}_desvio"] = ""
         resultado.append(linha)
     return resultado
 
 
-_ANCORA_RQ3 = re.compile(r"^\s*(?:#+\s*)?([1-5])\.\s*(.*)$", re.MULTILINE)
+_ANCORA_RQ3 = re.compile(r"^\s*(?:[•\-\*]\s*)?(?:#+\s*)?([1-5])\.\s*(.*)$", re.MULTILINE)
 
 
 def parse_rq3(texto):
@@ -298,13 +348,24 @@ def contar_termos(texto):
     return contagem
 
 
+def _achar_rq3(mdir):
+    """Acha o arquivo de resposta RQ3 numa pasta-modelo (case-insensitive)."""
+    if not os.path.isdir(mdir):
+        return None
+    for nome in sorted(os.listdir(mdir)):
+        if nome.lower() == "rq3.txt":
+            return os.path.join(mdir, nome)
+    return None
+
+
 def coletar_rq3(modelos=None):
     """Coleta seções e termos por modelo; loga seções ausentes."""
     dados = {}
     for modelo in (modelos if modelos is not None else descobrir_modelos()):
-        texto = ler_texto(os.path.join(RESPOSTAS_DIR, modelo, "RQ3.txt"))
+        caminho = _achar_rq3(os.path.join(RESPOSTAS_DIR, modelo))
+        texto = ler_texto(caminho) if caminho else None
         if texto is None:
-            registrar("AVISO", f"RQ3.txt ausente para o modelo: {modelo}")
+            registrar("AVISO", f"RQ3 (rq3.txt) ausente para o modelo: {modelo}")
             continue
         secoes = parse_rq3(texto)
         faltando = [str(n) for n, v in secoes.items() if v is None]
