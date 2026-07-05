@@ -100,3 +100,38 @@ def comparar_saida(saida, gabarito):
     if nums_s is not None and nums_g is not None and len(nums_s) == len(nums_g):
         return all(math.isclose(a, b, rel_tol=REL_TOL) for a, b in zip(nums_s, nums_g))
     return ns == ng
+
+
+def descobrir_modelos(base=RESPOSTAS_DIR):
+    """Lista pastas-modelo válidas em `base`, com salvaguarda contra modelos fantasma."""
+    modelos = []
+    if not os.path.isdir(base):
+        registrar("ERRO", f"Diretório de respostas não encontrado: {base}")
+        return modelos
+    for nome in sorted(os.listdir(base)):
+        caminho = os.path.join(base, nome)
+        if not os.path.isdir(caminho):
+            continue
+        tem_ex = any(re.fullmatch(r"Ex\d+", x) and
+                     os.path.isdir(os.path.join(caminho, x))
+                     for x in os.listdir(caminho))
+        if not tem_ex:
+            continue
+        if nome[0] in "._" or nome.lower() in IGNORAR_MODELOS:
+            registrar("AVISO", f"Pasta ignorada na descoberta de modelos: {nome}")
+            continue
+        modelos.append(nome)
+    return modelos
+
+
+def avaliar_status(exec_dir, gabarito):
+    """Classifica uma execução: ausente / erro_execucao / saida_incorreta / ok."""
+    output = ler_texto(os.path.join(exec_dir, "output.txt"))
+    usage = ler_texto(os.path.join(exec_dir, "usage.txt"))
+    if output is None or usage is None or gabarito is None:
+        registrar("AVISO", f"Arquivo ausente (output/usage/gabarito) em: {exec_dir}")
+        return "ausente"
+    err = ler_texto(os.path.join(exec_dir, "err.txt"))
+    if err is not None and err.strip():
+        return "erro_execucao"
+    return "ok" if comparar_saida(output, gabarito) else "saida_incorreta"

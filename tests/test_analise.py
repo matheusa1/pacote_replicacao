@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -53,6 +54,74 @@ class TestComparacao(unittest.TestCase):
     def test_comparar_texto_diferente(self):
         self.assertFalse(analise.comparar_saida("[36, 'Norway', 'John']",
                                                 "['age', 'country', 'name']"))
+
+
+class TestDescoberta(unittest.TestCase):
+    def setUp(self):
+        analise._AVISOS.clear()
+        self.tmp = tempfile.mkdtemp()
+
+    def _criar_modelo(self, nome, com_ex=True):
+        base = os.path.join(self.tmp, nome)
+        os.makedirs(os.path.join(base, "Ex1", "1")) if com_ex else os.makedirs(base)
+
+    def test_descobre_modelo_valido(self):
+        self._criar_modelo("Claude")
+        self.assertEqual(analise.descobrir_modelos(self.tmp), ["Claude"])
+
+    def test_ignora_underscore_e_ponto(self):
+        self._criar_modelo("Claude")
+        self._criar_modelo("_backup")
+        self._criar_modelo(".old")
+        self.assertEqual(analise.descobrir_modelos(self.tmp), ["Claude"])
+
+    def test_ignora_lista_negra(self):
+        self._criar_modelo("Claude")
+        self._criar_modelo("tmp")
+        self.assertEqual(analise.descobrir_modelos(self.tmp), ["Claude"])
+
+    def test_ignora_pasta_sem_ex(self):
+        self._criar_modelo("Claude")
+        self._criar_modelo("Prompt", com_ex=False)
+        self.assertEqual(analise.descobrir_modelos(self.tmp), ["Claude"])
+
+
+class TestAvaliarStatus(unittest.TestCase):
+    def setUp(self):
+        analise._AVISOS.clear()
+        self.tmp = tempfile.mkdtemp()
+
+    def _exec(self, output=None, err=""):
+        d = os.path.join(self.tmp, "1")
+        os.makedirs(d)
+        if output is not None:
+            with open(os.path.join(d, "output.txt"), "w", encoding="utf-8") as f:
+                f.write(output)
+        with open(os.path.join(d, "err.txt"), "w", encoding="utf-8") as f:
+            f.write(err)
+        with open(os.path.join(d, "usage.txt"), "w", encoding="utf-8") as f:
+            f.write("x")
+        return d
+
+    def test_ok(self):
+        d = self._exec(output="2")
+        self.assertEqual(analise.avaliar_status(d, "2"), "ok")
+
+    def test_saida_incorreta(self):
+        d = self._exec(output="3")
+        self.assertEqual(analise.avaliar_status(d, "2"), "saida_incorreta")
+
+    def test_erro_execucao(self):
+        d = self._exec(output="2", err="Traceback...")
+        self.assertEqual(analise.avaliar_status(d, "2"), "erro_execucao")
+
+    def test_ausente_sem_output(self):
+        d = self._exec(output=None)
+        self.assertEqual(analise.avaliar_status(d, "2"), "ausente")
+
+    def test_ausente_sem_gabarito(self):
+        d = self._exec(output="2")
+        self.assertEqual(analise.avaliar_status(d, None), "ausente")
 
 
 if __name__ == "__main__":
