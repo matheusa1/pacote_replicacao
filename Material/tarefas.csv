@@ -1,0 +1,16 @@
+modelo,tarefa,construto,variante
+Claude,ex1,lambda,funcional
+Codex,ex1,condicional (if/else com isinstance),procedural
+Claude,ex2,generator expression em função nomeada,funcional
+Codex,ex2,generator expression em lambda,funcional
+Claude,ex3,list comprehension,funcional
+Codex,ex3,for loop com append,procedural
+Claude,ex4,for loop com append,procedural
+Codex,ex4,list comprehension,funcional
+Claude,ex5,filter + lambda,funcional
+Codex,ex5,for loop com append,procedural
+Gemini,ex1,função nomeada,funcional
+Gemini,ex2,lambda com condicional (isinstance),funcional
+Gemini,ex3,for loop aninhado com append,procedural
+Gemini,ex4,list comprehension,funcional
+Gemini,ex5,map + lambda,funcional

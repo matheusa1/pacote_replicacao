@@ -1,4 +1,3 @@
-def function(x, y):
-    return min(x, y)
-
-print(function(4, 2))
+items = (2, 'pair', 3, 'odd')
+l = [x for x in items if isinstance(x, str)]
+print(l)
