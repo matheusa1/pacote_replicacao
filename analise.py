@@ -308,3 +308,79 @@ def coletar_rq3():
             registrar("AVISO", f"RQ3 [{modelo}]: seções ausentes: {', '.join(faltando)}")
         dados[modelo] = {"secoes": secoes, "termos": contar_termos(texto)}
     return dados
+
+
+def escrever_csv(caminho, linhas):
+    """Escreve uma lista de dicts como CSV utf-8."""
+    if not linhas:
+        registrar("AVISO", f"Sem dados para {caminho} (CSV não gerado).")
+        return
+    with open(caminho, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(linhas[0].keys()))
+        w.writeheader()
+        w.writerows(linhas)
+
+
+def escrever_rq3_comparativo(caminho, dados):
+    """Gera .md comparando as 5 seções da RQ3 entre modelos."""
+    titulos = {
+        1: "Quando usar funcional", 2: "Quando usar procedural",
+        3: "Regra prática de decisão", 4: "Exemplo mínimo",
+        5: "Maior risco/armadilha",
+    }
+    partes = ["# RQ3 — Comparativo entre modelos\n"]
+    for num in range(1, 6):
+        partes.append(f"\n## Seção {num} — {titulos[num]}\n")
+        for modelo, d in sorted(dados.items()):
+            corpo = d["secoes"].get(num)
+            partes.append(f"\n### {modelo}\n")
+            partes.append(f"\n{corpo if corpo else '*(seção ausente)*'}\n")
+    with open(caminho, "w", encoding="utf-8") as f:
+        f.write("".join(partes))
+
+
+def escrever_avisos(caminho):
+    """Persiste todos os avisos/erros acumulados."""
+    with open(caminho, "w", encoding="utf-8") as f:
+        f.write("\n".join(_AVISOS) + ("\n" if _AVISOS else ""))
+
+
+def main():
+    os.makedirs(RESULTADOS_DIR, exist_ok=True)
+    tarefas = carregar_tarefas()
+
+    # RQ1
+    rq1 = coletar_rq1()
+    escrever_csv(os.path.join(RESULTADOS_DIR, "rq1_execucoes.csv"), rq1)
+    for nome, chaves in [
+        ("rq1_por_modelo", ["modelo"]),
+        ("rq1_por_tarefa", ["tarefa"]),
+        ("rq1_por_construto", ["construto"]),
+        ("rq1_por_variante", ["variante"]),
+        ("rq1_por_modelo_tarefa", ["modelo", "tarefa"]),
+    ]:
+        escrever_csv(os.path.join(RESULTADOS_DIR, f"{nome}.csv"),
+                     taxa_por(rq1, chaves, tarefas))
+
+    # RQ2
+    rq2 = coletar_rq2()
+    escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_execucoes.csv"), rq2)
+    escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_modelo_tarefa.csv"),
+                 agregar_rq2(rq2, ["modelo", "tarefa"]))
+    escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_tarefa.csv"),
+                 agregar_rq2(rq2, ["tarefa"]))
+
+    # RQ3
+    rq3 = coletar_rq3()
+    escrever_rq3_comparativo(os.path.join(RESULTADOS_DIR, "rq3_comparativo.md"), rq3)
+    termos = [{"modelo": m, **rq3[m]["termos"]} for m in sorted(rq3)]
+    escrever_csv(os.path.join(RESULTADOS_DIR, "rq3_termos.csv"), termos)
+
+    # Resumo + log
+    print(f"\nModelos: {descobrir_modelos()} | execuções RQ1: {len(rq1)} | "
+          f"linhas RQ2: {len(rq2)} | avisos: {len(_AVISOS)}")
+    escrever_avisos(os.path.join(RESULTADOS_DIR, "avisos.log"))
+
+
+if __name__ == "__main__":
+    main()

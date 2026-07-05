@@ -224,5 +224,31 @@ class TestRQ3(unittest.TestCase):
         self.assertEqual(r["procedural"], 0)
 
 
+class TestEscrita(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_escrever_csv(self):
+        caminho = os.path.join(self.tmp, "x.csv")
+        analise.escrever_csv(caminho, [{"a": 1, "b": 2}, {"a": 3, "b": 4}])
+        with open(caminho, encoding="utf-8") as f:
+            conteudo = f.read()
+        self.assertIn("a,b", conteudo)
+        self.assertIn("3,4", conteudo)
+
+    def test_comparativo_marca_secao_ausente(self):
+        caminho = os.path.join(self.tmp, "c.md")
+        dados = {"Claude": {"secoes": {1: "texto1", 2: None, 3: None,
+                                       4: None, 5: None}, "termos": {}}}
+        analise.escrever_rq3_comparativo(caminho, dados)
+        with open(caminho, encoding="utf-8") as f:
+            conteudo = f.read()
+        self.assertIn("texto1", conteudo)
+        self.assertIn("*(seção ausente)*", conteudo)
+
+
 if __name__ == "__main__":
     unittest.main()
