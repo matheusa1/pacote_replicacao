@@ -37,3 +37,35 @@ def ler_texto(caminho):
         return None
     with open(caminho, encoding="utf-8") as f:
         return f.read()
+
+
+def expandir_tokens(s):
+    """Converte '6.3k' -> 6300 e '239' -> 239."""
+    s = s.strip().lower()
+    if s.endswith("k"):
+        return int(round(float(s[:-1]) * 1000))
+    return int(s)
+
+
+_LINHA_USAGE = re.compile(
+    r"^\s*([\w.-]+):\s*"
+    r"([\d.]+k?)\s+input,\s*"
+    r"([\d.]+k?)\s+output,\s*"
+    r"([\d.]+k?)\s+cache read,\s*"
+    r"([\d.]+k?)\s+cache write",
+    re.MULTILINE,
+)
+
+
+def parse_usage(texto):
+    """Extrai tokens por sub-modelo de um usage.txt."""
+    entradas = []
+    for m in _LINHA_USAGE.finditer(texto):
+        entradas.append({
+            "submodelo": m.group(1),
+            "input": expandir_tokens(m.group(2)),
+            "output": expandir_tokens(m.group(3)),
+            "cache_read": expandir_tokens(m.group(4)),
+            "cache_write": expandir_tokens(m.group(5)),
+        })
+    return entradas
