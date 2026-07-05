@@ -1,0 +1,42 @@
+• ## 1. Quando usar funcional (liste em bullets, máx. 5 pontos, cada um com 1 frase de justificativa)
+
+  - Use comprehensions para transformar ou filtrar coleções pequenas/médias, porque em Python elas são idiomáticas, legíveis e geralmente mais claras que map/
+    filter.
+
+  - Use map, filter ou funções de alta ordem quando a função aplicada já existe e o pipeline continua simples, porque evita código repetitivo sem esconder a
+    intenção.
+
+  - Use funções puras para regras de negócio, cálculos e validações, porque são mais fáceis de testar e menos propensas a efeitos colaterais.
+  - Use lambda apenas para expressões curtas em ordenação, agrupamento ou callbacks simples, porque lambdas longas ficam rapidamente ilegíveis.
+  - Use reduce raramente, quando estiver realmente acumulando um valor de forma natural, porque em Python um for costuma ser mais fácil de entender.
+
+  ## 2. Quando usar procedural (liste em bullets, máx. 5 pontos, cada um com 1 frase de justificativa)
+
+  - Use for explícito quando houver mais de uma etapa, porque debugar, logar e nomear valores intermediários fica mais simples.
+  - Use variáveis mutáveis quando estiver montando um resultado incremental com várias condições, porque isso deixa o fluxo mais transparente.
+  - Use while quando a repetição depender de uma condição dinâmica e não de percorrer uma coleção, porque expressa melhor controle de fluxo.
+  - Use comandos sequenciais quando houver I/O, chamadas externas, logs ou tratamento de erro, porque efeitos colaterais ficam mais claros em ordem explícita.
+  - Use procedural quando a versão funcional exigir lambdas aninhadas, reduce complexo ou compreensões grandes, porque concisão não compensa perda de leitura.
+
+  ## 3. Regra prática de decisão
+
+  Se a operação cabe naturalmente em “pegar uma coleção e produzir outra” em uma linha clara, use funcional/comprehension; se precisa explicar passos, lidar com
+  estado, erro ou efeito colateral, use procedural.
+
+  ## 4. Exemplo mínimo
+
+  nums = [1, 2, 3, 4, 5, 6]
+
+  funcional = [n * 2 for n in nums if n % 2 == 0]
+
+  procedural = []
+  for n in nums:
+      if n % 2 == 0:
+          procedural.append(n * 2)
+
+  # Eu recomendaria a versão funcional aqui, porque é uma transformação simples e idiomática em Python.
+
+  ## 5. Maior risco/armadilha
+
+  O erro mais comum é forçar estilo funcional para parecer “elegante”, criando expressões compactas demais que são mais difíceis de ler, debugar e manter do que
+  um for explícito.
