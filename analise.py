@@ -335,15 +335,16 @@ def estatisticas(valores):
     }
 
 
-def agregar_rq2(linhas, chaves, tarefas):
+def agregar_rq2(linhas, chaves, tarefas, apenas_completos=False):
     """Agrega tokens por `chaves`, somando sub-modelos dentro de cada execução.
 
     `chaves` pode incluir `construto`/`variante`, resolvidas via `tarefas`
     (mesma lógica de `_resolver_chave` usada no RQ1).
 
-    Campos ausentes (None) — ex.: entrada/saída do Codex, que só reporta total —
-    são ignorados: a execução não contribui para a estatística daquele campo, e
-    um grupo sem nenhum dado de um campo tem suas colunas deixadas vazias.
+    Se apenas_completos=True, considera apenas execuções que possuem dados de
+    breakdown de tokens (entrada e saída não nulos). Caso contrário, processa
+    todas, mas deixa colunas de entrada/saída vazias se houver mistura de
+    modelos com e sem breakdown no mesmo grupo.
     """
     # 1) soma sub-modelos por execução completa (identidade: modelo+tarefa+exec).
     #    Um campo permanece None enquanto nenhum sub-modelo tiver valor para ele.
@@ -362,6 +363,8 @@ def agregar_rq2(linhas, chaves, tarefas):
     grupos = {}
     execs_por_grupo = {}
     for k, v in por_exec.items():
+        if apenas_completos and (v["input"] is None or v["output"] is None):
+            continue
         ln = exec_campos[k]
         gk = tuple(_resolver_chave(ln, c, tarefas) for c in chaves)
         g = grupos.setdefault(gk, {"input": [], "output": [], "total": []})
@@ -369,13 +372,17 @@ def agregar_rq2(linhas, chaves, tarefas):
         for campo in ("input", "output", "total"):
             if v[campo] is not None:
                 g[campo].append(v[campo])
-    # 3) estatísticas (campo sem dados -> colunas vazias)
+    # 3) estatísticas (campo sem dados ou com mistura inconsistente -> colunas vazias)
     resultado = []
     for gk, g in sorted(grupos.items()):
         linha = dict(zip(chaves, gk))
         linha["execucoes"] = execs_por_grupo[gk]
         for campo in ("input", "output", "total"):
-            if g[campo]:
+            if campo in ("input", "output") and not apenas_completos and len(g[campo]) < execs_por_grupo[gk]:
+                linha[f"{campo}_media"] = ""
+                linha[f"{campo}_mediana"] = ""
+                linha[f"{campo}_desvio"] = ""
+            elif g[campo]:
                 est = estatisticas(g[campo])
                 linha[f"{campo}_media"] = est["media"]
                 linha[f"{campo}_mediana"] = est["mediana"]
@@ -501,8 +508,12 @@ def main():
                  agregar_rq2(rq2, ["modelo", "tarefa"], tarefas))
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_tarefa.csv"),
                  agregar_rq2(rq2, ["tarefa"], tarefas))
+    # Para variantes gerais (que misturam todos os modelos), deixamos input/output vazios
     escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_variante.csv"),
-                 agregar_rq2(rq2, ["variante"], tarefas))
+                 agregar_rq2(rq2, ["variante"], tarefas, apenas_completos=False))
+    # Geramos uma tabela extra apenas com execuções completas (breakdown de tokens consistente)
+    escrever_csv(os.path.join(RESULTADOS_DIR, "rq2_por_variante_breakdown.csv"),
+                 agregar_rq2(rq2, ["variante"], tarefas, apenas_completos=True))
 
     # RQ3
     rq3 = coletar_rq3(modelos)
