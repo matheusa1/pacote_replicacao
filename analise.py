@@ -91,6 +91,35 @@ def parse_usage_total(texto):
     return int(num)
 
 
+def remover_wrapper_numpy(texto):
+    """Remove o wrapper 'array(...)' do repr do NumPy, preservando o conteúdo
+    interno (ex.: 'array([2, 3])' -> '[2, 3]'), recursivamente para casos
+    aninhados. Sem isso, uma saída correta como '[array([2, 3]), array([4,
+    5])]' seria comparada literalmente contra o gabarito '[[2, 3], [4, 5]]'
+    e marcada como incorreta.
+    """
+    marcador = "array("
+    resultado = []
+    i, n = 0, len(texto)
+    while i < n:
+        if texto.startswith(marcador, i):
+            i += len(marcador)
+            profundidade = 1
+            inicio = i
+            while i < n and profundidade > 0:
+                if texto[i] == "(":
+                    profundidade += 1
+                elif texto[i] == ")":
+                    profundidade -= 1
+                i += 1
+            interior = texto[inicio:i - 1]
+            resultado.append(remover_wrapper_numpy(interior))
+        else:
+            resultado.append(texto[i])
+            i += 1
+    return "".join(resultado)
+
+
 def normalizar_saida(texto):
     """Normaliza: strip por linha, remove linhas vazias nas pontas."""
     linhas = texto.replace("\r\n", "\n").split("\n")
@@ -115,7 +144,8 @@ def _como_numeros(texto):
 
 def comparar_saida(saida, gabarito):
     """True se a saída bate com o gabarito (numérico com tolerância, senão texto)."""
-    ns, ng = normalizar_saida(saida), normalizar_saida(gabarito)
+    ns = normalizar_saida(remover_wrapper_numpy(saida))
+    ng = normalizar_saida(remover_wrapper_numpy(gabarito))
     nums_s, nums_g = _como_numeros(ns), _como_numeros(ng)
     if nums_s is not None and nums_g is not None and len(nums_s) == len(nums_g):
         return all(math.isclose(a, b, rel_tol=REL_TOL) for a, b in zip(nums_s, nums_g))
@@ -158,20 +188,25 @@ def avaliar_status(exec_dir, gabarito):
 
 
 def carregar_tarefas():
-    """Lê Material/tarefas.csv -> {tarefa: {construto, variante}}."""
+    """Lê Material/tarefas.csv -> {(modelo, tarefa): {construto, variante}}.
+
+    Cada modelo recebeu uma variante diferente (funcional/procedural) do
+    mesmo exercício, então construto/variante são chaveados por modelo+tarefa.
+    """
     tarefas = {}
     texto = ler_texto(TAREFAS_CSV)
     if texto is None:
         registrar("ERRO", f"tarefas.csv não encontrado: {TAREFAS_CSV}")
         return tarefas
     for row in csv.DictReader(texto.splitlines()):
+        m = row["modelo"].strip()
         t = row["tarefa"].strip().lower()
-        tarefas[t] = {
+        tarefas[(m, t)] = {
             "construto": row["construto"].strip(),
             "variante": row["variante"].strip(),
         }
         if "PLACEHOLDER" in (row["construto"] + row["variante"]).upper():
-            registrar("AVISO", f"tarefas.csv ainda com placeholder em: {t}")
+            registrar("AVISO", f"tarefas.csv ainda com placeholder em: {m}/{t}")
     return tarefas
 
 
@@ -191,13 +226,20 @@ def _iter_execucoes(modelos=None):
 
 
 def coletar_rq1(modelos=None):
-    """Varre as execuções e classifica o status de cada uma."""
+    """Varre as execuções e classifica o status de cada uma.
+
+    O gabarito é buscado por (modelo, tarefa): cada modelo recebeu uma
+    variante diferente do mesmo exercício, então a resposta certa também
+    varia por modelo.
+    """
     linhas = []
     gabaritos = {}
     for modelo, tarefa, edir in _iter_execucoes(modelos):
-        if tarefa not in gabaritos:
-            gabaritos[tarefa] = ler_texto(os.path.join(GABARITO_DIR, f"{tarefa}.txt"))
-        gabarito = gabaritos[tarefa]
+        chave = (modelo, tarefa)
+        if chave not in gabaritos:
+            gabaritos[chave] = ler_texto(
+                os.path.join(GABARITO_DIR, modelo, f"{tarefa}.txt"))
+        gabarito = gabaritos[chave]
         ex = os.path.basename(edir)
         linhas.append({
             "modelo": modelo, "tarefa": tarefa, "exec": ex,
@@ -208,7 +250,7 @@ def coletar_rq1(modelos=None):
 
 def _resolver_chave(linha, chave, tarefas):
     if chave in ("construto", "variante"):
-        return tarefas.get(linha["tarefa"], {}).get(chave, "DESCONHECIDO")
+        return tarefas.get((linha["modelo"], linha["tarefa"]), {}).get(chave, "DESCONHECIDO")
     return linha[chave]
 
 

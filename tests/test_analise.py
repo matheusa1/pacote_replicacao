@@ -198,8 +198,8 @@ class TestAvaliarStatus(unittest.TestCase):
 class TestAgregacaoRQ1(unittest.TestCase):
     def setUp(self):
         self.tarefas = {
-            "ex1": {"construto": "lambda", "variante": "funcional"},
-            "ex2": {"construto": "comprehension", "variante": "funcional"},
+            ("Claude", "ex1"): {"construto": "lambda", "variante": "funcional"},
+            ("Claude", "ex2"): {"construto": "comprehension", "variante": "funcional"},
         }
         self.linhas = [
             {"modelo": "Claude", "tarefa": "ex1", "exec": "1", "status": "ok"},
