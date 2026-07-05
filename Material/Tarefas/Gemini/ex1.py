@@ -1,4 +1,4 @@
-# Please, modifythe lambda so thatit returns theminimum between x and y.
+# Please, modify the lambda so that it returns the minimum between x and y.
 
 def function(x, y):
     return x + y * 10
