@@ -167,5 +167,32 @@ class TestAgregacaoRQ1(unittest.TestCase):
         self.assertEqual(lam["taxa"], 0.5)
 
 
+class TestRQ2(unittest.TestCase):
+    def test_estatisticas(self):
+        r = analise.estatisticas([10, 20, 30])
+        self.assertEqual(r["media"], 20.0)
+        self.assertEqual(r["mediana"], 20.0)
+        self.assertAlmostEqual(r["desvio"], 8.1649, places=3)
+
+    def test_estatisticas_vazio(self):
+        self.assertEqual(analise.estatisticas([]),
+                         {"media": 0.0, "mediana": 0.0, "desvio": 0.0})
+
+    def test_agregar_soma_submodelos_por_execucao(self):
+        linhas = [
+            {"modelo": "Claude", "tarefa": "ex1", "exec": "1",
+             "submodelo": "haiku", "input": 100, "output": 10, "total": 110},
+            {"modelo": "Claude", "tarefa": "ex1", "exec": "1",
+             "submodelo": "opus", "input": 900, "output": 90, "total": 990},
+            {"modelo": "Claude", "tarefa": "ex1", "exec": "2",
+             "submodelo": "opus", "input": 1000, "output": 100, "total": 1100},
+        ]
+        r = analise.agregar_rq2(linhas, ["modelo", "tarefa"])
+        self.assertEqual(len(r), 1)
+        # execução 1 soma 1000 input; execução 2 soma 1000 input -> média 1000
+        self.assertEqual(r[0]["input_media"], 1000.0)
+        self.assertEqual(r[0]["total_media"], 1100.0)
+
+
 if __name__ == "__main__":
     unittest.main()

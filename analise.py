@@ -200,3 +200,69 @@ def taxa_por(linhas, chaves, tarefas):
         linha["taxa"] = round(g["sucessos"] / g["total"], 2) if g["total"] else 0.0
         resultado.append(linha)
     return resultado
+
+
+def coletar_rq2():
+    """Uma linha por (execução × sub-modelo) com os tokens."""
+    linhas = []
+    for modelo in descobrir_modelos():
+        mdir = os.path.join(RESPOSTAS_DIR, modelo)
+        for tdir in sorted(os.listdir(mdir)):
+            if not re.fullmatch(r"Ex\d+", tdir):
+                continue
+            tarefa = tdir.lower()
+            tcaminho = os.path.join(mdir, tdir)
+            for ex in sorted(os.listdir(tcaminho)):
+                edir = os.path.join(tcaminho, ex)
+                if not os.path.isdir(edir):
+                    continue
+                texto = ler_texto(os.path.join(edir, "usage.txt"))
+                if texto is None:
+                    registrar("AVISO", f"usage.txt ausente (RQ2 pulada) em: {edir}")
+                    continue
+                for e in parse_usage(texto):
+                    e.update({"modelo": modelo, "tarefa": tarefa, "exec": ex,
+                              "total": e["input"] + e["output"]})
+                    linhas.append(e)
+    return linhas
+
+
+def estatisticas(valores):
+    """Média, mediana e desvio populacional; vazio -> zeros."""
+    if not valores:
+        return {"media": 0.0, "mediana": 0.0, "desvio": 0.0}
+    return {
+        "media": round(statistics.mean(valores), 2),
+        "mediana": round(statistics.median(valores), 2),
+        "desvio": round(statistics.pstdev(valores), 4),
+    }
+
+
+def agregar_rq2(linhas, chaves):
+    """Agrega tokens por `chaves`, somando sub-modelos dentro de cada execução."""
+    # 1) soma sub-modelos por execução completa (chaves + exec)
+    por_exec = {}
+    for ln in linhas:
+        k = tuple(ln[c] for c in chaves) + (ln["exec"],)
+        acc = por_exec.setdefault(k, {"input": 0, "output": 0, "total": 0})
+        for campo in ("input", "output", "total"):
+            acc[campo] += ln[campo]
+    # 2) agrupa execuções por `chaves`
+    grupos = {}
+    for k, v in por_exec.items():
+        gk = k[:len(chaves)]
+        g = grupos.setdefault(gk, {"input": [], "output": [], "total": []})
+        for campo in ("input", "output", "total"):
+            g[campo].append(v[campo])
+    # 3) estatísticas
+    resultado = []
+    for gk, g in sorted(grupos.items()):
+        linha = dict(zip(chaves, gk))
+        linha["execucoes"] = len(g["total"])
+        for campo in ("input", "output", "total"):
+            est = estatisticas(g[campo])
+            linha[f"{campo}_media"] = est["media"]
+            linha[f"{campo}_mediana"] = est["mediana"]
+            linha[f"{campo}_desvio"] = est["desvio"]
+        resultado.append(linha)
+    return resultado
