@@ -37,5 +37,23 @@ class TestParseUsage(unittest.TestCase):
         self.assertEqual(opus["cache_write"], 8300)
 
 
+class TestComparacao(unittest.TestCase):
+    def test_normalizar_remove_espacos_e_linhas(self):
+        self.assertEqual(analise.normalizar_saida("  2 \n\n"), "2")
+
+    def test_comparar_texto_igual(self):
+        self.assertTrue(analise.comparar_saida("(2, 4, 6)\n", "(2, 4, 6)"))
+
+    def test_comparar_numerico_2_vs_2ponto0(self):
+        self.assertTrue(analise.comparar_saida("2.0", "2"))
+
+    def test_comparar_numerico_diferente(self):
+        self.assertFalse(analise.comparar_saida("3", "2"))
+
+    def test_comparar_texto_diferente(self):
+        self.assertFalse(analise.comparar_saida("[36, 'Norway', 'John']",
+                                                "['age', 'country', 'name']"))
+
+
 if __name__ == "__main__":
     unittest.main()

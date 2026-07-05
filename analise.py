@@ -69,3 +69,34 @@ def parse_usage(texto):
             "cache_write": expandir_tokens(m.group(5)),
         })
     return entradas
+
+
+def normalizar_saida(texto):
+    """Normaliza: strip por linha, remove linhas vazias nas pontas."""
+    linhas = texto.replace("\r\n", "\n").split("\n")
+    linhas = [ln.strip() for ln in linhas]
+    while linhas and linhas[0] == "":
+        linhas.pop(0)
+    while linhas and linhas[-1] == "":
+        linhas.pop()
+    return "\n".join(linhas)
+
+
+def _como_numeros(texto):
+    """Retorna lista de floats se todos os tokens do texto forem numéricos, senão None."""
+    tokens = texto.replace(",", " ").split()
+    if not tokens:
+        return None
+    try:
+        return [float(t) for t in tokens]
+    except ValueError:
+        return None
+
+
+def comparar_saida(saida, gabarito):
+    """True se a saída bate com o gabarito (numérico com tolerância, senão texto)."""
+    ns, ng = normalizar_saida(saida), normalizar_saida(gabarito)
+    nums_s, nums_g = _como_numeros(ns), _como_numeros(ng)
+    if nums_s is not None and nums_g is not None and len(nums_s) == len(nums_g):
+        return all(math.isclose(a, b, rel_tol=REL_TOL) for a, b in zip(nums_s, nums_g))
+    return ns == ng
