@@ -1,0 +1,8 @@
+▸ Thought for 2s, 450 tokens
+  Initiating Code Generation
+
+▸ Thought for 2s, 1.2k tokens
+  Refining the Logic
+
+▸ Thought for 2s, 523 tokens
+  Avoiding Unnecessary Testing
