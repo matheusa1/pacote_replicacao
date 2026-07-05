@@ -1,0 +1,26 @@
+Mê dê uma resposta prática (não acadêmica) sobre quando usar construtos funcionais 
+(map, filter, reduce, list/dict/set comprehensions, funções puras, funções de 
+alta ordem, lambda) versus construtos procedurais (loops explícitos com for/while, 
+variáveis mutáveis, comandos sequenciais) em Python.
+
+Responda EXATAMENTE no seguinte formato, com essas seções e nessa ordem:
+
+## 1. Quando usar funcional (liste em bullets, máx. 5 pontos, cada um com 1 frase de justificativa)
+
+## 2. Quando usar procedural (liste em bullets, máx. 5 pontos, cada um com 1 frase de justificativa)
+
+## 3. Regra prática de decisão
+Uma única heurística curta (1-2 frases) que resuma como escolher entre os dois no dia a dia.
+
+## 4. Exemplo mínimo
+Um único trecho de código (mesmo problema, ~5 linhas) mostrando a versão funcional 
+e a procedural lado a lado, com um comentário de 1 linha dizendo qual você 
+recomendaria e por quê.
+
+## 5. Maior risco/armadilha
+Um ponto único: o erro mais comum que devs cometem ao escolher o estilo errado 
+em Python.
+
+Seja direto e objetivo. Evite discurso genérico sobre paradigmas de programação — 
+foque especificamente em Python e em decisões reais de código de produção. 
+Não adicione seções extras além das 5 listadas.

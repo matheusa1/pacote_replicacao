@@ -1,0 +1,36 @@
+1. Quando usar funcional (liste em bullets, máx. 5 pontos, cada um com 1 frase de justificativa)
+
+- Transformar uma coleção em outra (map/comprehension) — expressa a intenção "para cada item, produza X" sem gerenciar índices ou listas acumuladoras manualmente.
+- Filtrar itens por uma condição (filter/comprehension com if) — deixa o critério explícito em uma linha, evitando o boilerplate de append dentro de loop.
+- Encadear transformações puras sobre dados (ex.: sorted, map, generators) — cada etapa é isolada e testável, facilitando composição e paralelização.
+- Cálculos sem efeitos colaterais (funções puras) — mesmo input sempre gera mesmo output, o que torna testes triviais e o comportamento previsível.
+- Passar comportamento como argumento (funções de alta ordem, key=, sorted, groupby) — parametriza a lógica sem duplicar estrutura de controle.
+
+2. Quando usar procedural (liste em bullets, máx. 5 pontos, cada um com 1 frase de justificativa)
+
+- Efeitos colaterais são o objetivo (I/O, logging, escrita em banco, chamadas de rede) — loops explícitos tornam a sequência de ações e o tratamento de erro claros.
+- Lógica com múltiplas condições, break/continue ou early return — um comprehension aninhado vira ilegível; o for mostra o fluxo de controle honestamente.
+- Acumular estado interdependente entre iterações (ex.: parsing com contexto, máquina de estados) — variáveis mutáveis expressam a evolução do estado melhor que reduce.
+- Precisa de logs, debugging ou breakpoints passo a passo — dá para inspecionar e printar em cada iteração, o que é impossível dentro de um comprehension.
+- Corpo do loop é grande ou tem várias responsabilidades — espremer isso numa expressão sacrifica legibilidade sem ganho real.
+
+3. Regra prática de decisão
+
+Use funcional quando você está transformando dados sem efeitos colaterais e a expressão cabe legivelmente em uma linha; caia para procedural assim que precisar de efeitos colaterais, controle de fluxo (break/continue), ou o corpo ficar grande demais para uma expressão limpa.
+
+4. Exemplo mínimo
+
+nums = [1, 2, 3, 4, 5]
+
+# Funcional: transformação pura e direta → RECOMENDADO aqui, mais legível e sem estado manual
+pares_ao_quadrado = [n * n for n in nums if n % 2 == 0]
+
+# Procedural: mesmo resultado, mas com boilerplate de acumulador desnecessário para este caso
+pares_ao_quadrado = []
+for n in nums:
+    if n % 2 == 0:
+        pares_ao_quadrado.append(n * n)
+
+5. Maior risco/armadilha
+
+Forçar reduce, lambda e comprehensions aninhados em lógica complexa só para "ser funcional" — em Python isso produz expressões densas e ilegíveis (o próprio Guido desencoraja reduce), quando um for explícito seria mais claro e debugável; legibilidade vence pureza de paradigma.
